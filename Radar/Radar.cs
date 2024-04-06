@@ -67,7 +67,7 @@ namespace Radar
             // Add a custom configuration option for the Apply button
             radarLanguage = Config.Bind<string>(baseSettings, "Language", "EN",
                 new ConfigDescription("Preferred language, if not available will tried English",
-                new AcceptableValueList<string>("EN", "ZH")));
+                new AcceptableValueList<string>("EN", "ZH", "RU")));
 
             radarEnableConfig = Config.Bind(baseSettings, Locales.GetTranslatedString("radar_enable"), true);
             radarEnableShortCutConfig = Config.Bind(baseSettings, Locales.GetTranslatedString("radar_enable_shortcut"), new KeyboardShortcut(KeyCode.F10));
