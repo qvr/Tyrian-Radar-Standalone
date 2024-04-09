@@ -54,7 +54,7 @@ class ItemExtensions
         }
     }
 
-    public static TraderOffer GetTraderOffer(Item item, TraderClass trader)
+    public static TraderOffer? GetTraderOffer(Item item, TraderClass trader)
     {
         var result = trader.GetUserItemPrice(item);
         return result is null ? null : new(
@@ -65,7 +65,7 @@ class ItemExtensions
         );
     }
 
-    public static IEnumerable<TraderOffer> GetAllTraderOffers(Item item)
+    public static IEnumerable<TraderOffer?>? GetAllTraderOffers(Item item)
     {
         if (!Session.Profile.Examined(item))
             return null;
@@ -83,10 +83,10 @@ class ItemExtensions
         }
         return Session.Traders
             .Select(trader => GetTraderOffer(item, trader))
-            .Where(offer => offer is not null)
-            .OrderByDescending(offer => offer.Price * offer.Course);
+            .Where(offer => offer != null)
+            .OrderByDescending(offer => offer?.Price * offer?.Course);
     }
 
-    public static TraderOffer GetBestTraderOffer(Item item) =>
+    public static TraderOffer? GetBestTraderOffer(Item item) =>
         GetAllTraderOffers(item)?.FirstOrDefault() ?? null;
 }
