@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using EFT.Interactive;
 
 namespace Radar
 {
@@ -34,9 +30,9 @@ namespace Radar
             return (root == null) ? 0 : root.Count();
         }
 
-        public void Remove(Vector2 point, int key)
+        public void Remove(Vector2 point, LootItem item)
         {
-            root.Remove(point, key);
+            root.Remove(point, item);
         }
 
         public void Clear()
@@ -102,7 +98,7 @@ namespace Radar
             }
         }
 
-        public void Remove(Vector2 point, int key)
+        public void Remove(Vector2 point, LootItem item)
         {
             if (children[0] != null)
             {
@@ -110,7 +106,7 @@ namespace Radar
                 {
                     if (child.bounds.Contains(point))
                     {
-                        child.Remove(point, key);
+                        child.Remove(point, item);
                         break;
                     }
                 }
@@ -119,7 +115,7 @@ namespace Radar
             {
                 foreach (var obj in objects)
                 {
-                    if (obj.obj._key == key)
+                    if (obj.obj._item == item)
                     {
                         objects.Remove(obj);
                         break;

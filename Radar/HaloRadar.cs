@@ -1,15 +1,12 @@
 ﻿using EFT;
-using System;
-using System.IO;
 using System.Collections;
 using System.Collections.Generic;
 using Comfort.Common;
 using UnityEngine;
 using UnityEngine.UI;
-using LootItem = EFT.Interactive.LootItem;
+using EFT.Interactive;
 using System.Linq;
 using BepInEx.Configuration;
-using Object = UnityEngine.Object;
 
 namespace Radar
 {
@@ -114,6 +111,7 @@ namespace Radar
             if (e == null || e.ChangedSetting == Radar.radarEnablePulseConfig)
             {
                 TogglePulseAnimation(Radar.radarEnablePulseConfig.Value);
+                Radar.radarEnableLootConfig.Value = false;
             }
 
             if (e != null && (e.ChangedSetting == Radar.radarEnableLootConfig || e.ChangedSetting == Radar.radarLootThreshold))
@@ -169,10 +167,11 @@ namespace Radar
         public void RemoveLoot(int key)
         {
             Vector2 point = Vector2.zero;
-            
+            LootItem item = _gameWorld.LootItems.GetByKey(key);
+
             foreach (var loot in _lootCustomObject)
             {
-                if (loot._key == key)
+                if (loot._key == key || loot._item == item)
                 {
                     point.x = loot.targetPosition.x;
                     point.y = loot.targetPosition.z;
@@ -181,7 +180,7 @@ namespace Radar
                     break;
                 }
             }
-            _lootTree?.Remove(point, key);
+            _lootTree?.Remove(point, item);
         }
 
         private void TogglePulseAnimation(bool enable)
