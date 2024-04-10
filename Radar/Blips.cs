@@ -9,16 +9,17 @@ namespace Radar
 {
     public class BlipPlayer : Target
     {
-        private Player enemyPlayer = null;
-        private bool isDead = false;
+        private Player? _enemyPlayer = null;
+        private bool _isDead = false;
         public BlipPlayer(Player enemyPlayer)
         {
-            this.enemyPlayer = enemyPlayer;
+            this._enemyPlayer = enemyPlayer;
         }
 
         private void UpdateBlipImage()
         {
-            if (isDead)
+            if (blip == null || blipImage == null) return;
+            if (_isDead)
             {
                 blipImage.sprite = AssetBundleManager.EnemyBlipDead;
                 blipImage.color = Radar.corpseBlipColor.Value;
@@ -39,10 +40,10 @@ namespace Radar
                     blipImage.sprite = AssetBundleManager.EnemyBlipDown;
                 }
                 // set blip color
-                switch (enemyPlayer.Profile.Info.Side)
+                switch (_enemyPlayer?.Profile.Info.Side)
                 {
                     case EPlayerSide.Savage:
-                        switch (enemyPlayer.Profile.Info.Settings.Role)
+                        switch (_enemyPlayer.Profile.Info.Settings.Role)
                         {
                             case WildSpawnType.assault:
                             case WildSpawnType.marksman:
@@ -71,31 +72,32 @@ namespace Radar
         public void Update(bool updatePosition)
         {
             bool _show = false;
-            if (enemyPlayer != null)
+            if (_enemyPlayer != null)
             {
                 if (updatePosition)
                 {
                     // this enemyPlayer read is expensive
-                    GameObject enemyObject = enemyPlayer.gameObject;
-                    blipPosition.x = enemyObject.transform.position.x - playerPosition.x;
-                    blipPosition.y = enemyObject.transform.position.y - playerPosition.y;
-                    blipPosition.z = enemyObject.transform.position.z - playerPosition.z;
+                    GameObject enemyObject = _enemyPlayer.gameObject;
+                    targetPosition = enemyObject.transform.position;
+                    blipPosition.x = targetPosition.x - playerPosition.x;
+                    blipPosition.y = targetPosition.y - playerPosition.y;
+                    blipPosition.z = targetPosition.z - playerPosition.z;
                 }
 
                 _show = blipPosition.x * blipPosition.x + blipPosition.z * blipPosition.z
                      > radarRange * radarRange ? false : true;
-                if (!isDead && enemyPlayer.HealthController.IsAlive == isDead)
+                if (!_isDead && _enemyPlayer.HealthController.IsAlive == _isDead)
                 {
-                    isDead = true;
+                    _isDead = true;
                 }
 
-                if (isDead)
+                if (_isDead)
                 {
                     _show = Radar.radarEnableCorpseConfig.Value && _show;
                 }
             }
 
-            if (show && !_show)
+            if (show && !_show && blipImage != null)
             {
                 blipImage.color = new Color(0, 0, 0, 0);
             }
@@ -113,24 +115,31 @@ namespace Radar
 
     public class BlipLoot : Target
     {
-        public int price = 0;
-        public string itemId;
-        private Vector3 itemPosition;
+        public int _price = 0;
+        public LootItem _item;
+        public string _itemId;
+        private bool _lazyUpdate;
+        public int _key;
 
-        public BlipLoot(LootItem item)
+        public BlipLoot(LootItem item, bool lazyUpdate = false, int key = 0)
         {
-            this.itemId = item.ItemId;
+            _item = item;
+            _itemId = item.ItemId;
+            _lazyUpdate = lazyUpdate;
+            _key = key;
             var offer = ItemExtensions.GetBestTraderOffer(item.Item);
-            itemPosition = item.TrackableTransform.position;
+            targetPosition = item.TrackableTransform.position;
 
             if (offer != null)
             {
-                this.price = offer.Price;
+                _price = offer.Price;
             }
         }
 
         private void UpdateBlipImage()
         {
+            if (blip == null || blipImage == null)
+                return;
             float totalThreshold = playerHeight * 1.5f * Radar.radarYHeightThreshold.Value;
             if (blipPosition.y > totalThreshold)
             {
@@ -149,22 +158,24 @@ namespace Radar
             blip.transform.localScale = new Vector3(blipSize, blipSize, blipSize);
         }
 
-        public void Update(bool updatePosition)
+        public void Update(bool updatePosition, bool _show = false)
         {
-            blipPosition.x = itemPosition.x - playerPosition.x;
-            blipPosition.y = itemPosition.y - playerPosition.y;
-            blipPosition.z = itemPosition.z - playerPosition.z;
-
-            bool _show = Radar.radarEnableLootConfig.Value && this.price > Radar.radarLootThreshold.Value && blipPosition.x * blipPosition.x + blipPosition.z * blipPosition.z
-                 < radarRange * radarRange;
-
-            if (show && !_show)
+            if (_lazyUpdate)
             {
-                blipImage.color = new Color(0, 0, 0, 0);
+                targetPosition = _item.TrackableTransform.position;
+                _lazyUpdate = false;
             }
 
-            show = _show;
-            if (show)
+            blipPosition.x = targetPosition.x - playerPosition.x;
+            blipPosition.y = targetPosition.y - playerPosition.y;
+            blipPosition.z = targetPosition.z - playerPosition.z;
+
+            if (!_show)
+            {
+                if (blipImage != null)
+                    blipImage.color = new Color(0, 0, 0, 0);
+            }
+            else
             {
                 UpdateAlpha();
                 UpdateBlipImage();
@@ -181,16 +192,17 @@ namespace Radar
     public class Target
     {
         public bool show = false;
-        protected GameObject blip;
-        protected Image blipImage;
+        protected GameObject? blip;
+        protected Image? blipImage;
 
         protected Vector3 blipPosition;
+        public Vector3 targetPosition;
         public static Vector3 playerPosition;
         public static float radarRange;
 
         protected float playerHeight = 1.8f;
 
-        private void SetBlip()
+        public void SetBlip()
         {
             var blipInstance = Object.Instantiate(AssetBundleManager.RadarBliphudPrefab,
                 HaloRadar.RadarHudBlipBasePosition.position, HaloRadar.RadarHudBlipBasePosition.rotation);
@@ -199,14 +211,16 @@ namespace Radar
             blip.transform.SetAsLastSibling();
 
             var blipTransform = blip.transform.Find("Blip/RadarEnemyBlip") as RectTransform;
-            blipImage = blipTransform.GetComponent<Image>();
-            blipImage.color = Color.clear;
+            if (blipTransform != null)
+            {
+                blipImage = blipTransform.GetComponent<Image>();
+                blipImage.color = Color.clear;
+            }
             blip.SetActive(true);
         }
 
         public Target()
         {
-            SetBlip();
         }
 
         public void DestoryBlip()
@@ -226,18 +240,26 @@ namespace Radar
 
         protected void UpdateAlpha()
         {
-            float r = blipImage.color.r, g = blipImage.color.g, b = blipImage.color.b, a = blipImage.color.a;
-            float delta_a = 1;
-            if (Radar.radarScanInterval.Value > 0.8)
+            float r, g, b, a;
+            if (blipImage != null)
             {
-                float ratio = (Time.time - HaloRadar.RadarLastUpdateTime) / Radar.radarScanInterval.Value;
-                delta_a = 1 - ratio * ratio;
+                r = blipImage.color.r;
+                g = blipImage.color.g;
+                b = blipImage.color.b;
+                a = blipImage.color.a;
+                float delta_a = 1;
+                if (Radar.radarScanInterval.Value > 0.8)
+                {
+                    float ratio = (Time.time - HaloRadar.RadarLastUpdateTime) / Radar.radarScanInterval.Value;
+                    delta_a = 1 - ratio * ratio;
+                }
+                blipImage.color = new Color(r, g, b, a * delta_a);
             }
-            blipImage.color = new Color(r, g, b, a * delta_a);
         }
 
         protected void UpdatePosition(bool updatePosition)
         {
+            if (blip == null) return;
             Quaternion reverseRotation = Quaternion.Inverse(HaloRadar.RadarHudBlipBasePosition.rotation);
             blip.transform.localRotation = reverseRotation;
 

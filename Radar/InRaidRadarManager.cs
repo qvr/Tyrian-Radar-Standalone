@@ -5,7 +5,7 @@ namespace Radar
 {
     public class InRaidRadarManager: MonoBehaviour
     {
-        private GameObject _radarGo;
+        static public GameObject _radarGo;
         
         private bool _enableSCDown = false;
         private bool _corpseSCDown = false;
@@ -13,6 +13,8 @@ namespace Radar
         
         private void Awake()
         {
+            new GClass723PatchAdd().Enable();
+            new GClass723PatchRemove().Enable();
             var playerCamera = GameObject.Find("FPS Camera");
             if (playerCamera == null)
             {
