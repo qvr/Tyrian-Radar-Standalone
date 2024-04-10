@@ -35,8 +35,10 @@ namespace Radar
         private readonly HashSet<int> _enemyList = new HashSet<int>();
         private readonly List<BlipPlayer> _enemyCustomObject = new List<BlipPlayer>();
 
-        private readonly HashSet<string> _lootList = new HashSet<string>();
         private readonly List<BlipLoot> _lootCustomObject = new List<BlipLoot>();
+        private Quadtree? _lootTree = null;
+        private List<BlipLoot>? _activeLootOnRadar = null;
+        private List<BlipLoot> _lootToHide = new List<BlipLoot>();
 
         private void Awake()
         {
@@ -86,6 +88,23 @@ namespace Radar
             Radar.Instance.Config.SettingChanged -= UpdateRadarSettings;
         }
 
+        private void ClearLoot()
+        {
+            if (_lootTree != null)
+            {
+                _lootTree.Clear();
+                _lootTree = null;
+            }
+            if (_lootCustomObject.Count > 0)
+            {
+                foreach (var loot in _lootCustomObject)
+                {
+                    loot.DestoryLoot();
+                }
+                _lootCustomObject.Clear();
+            }
+        }
+
         private void UpdateRadarSettings(object? sender = null, SettingChangedEventArgs? e = null)
         {
             if (!gameObject.activeInHierarchy) return; // Don't update if the radar object is disabled
@@ -96,6 +115,73 @@ namespace Radar
             {
                 TogglePulseAnimation(Radar.radarEnablePulseConfig.Value);
             }
+
+            if (e != null && (e.ChangedSetting == Radar.radarEnableLootConfig || e.ChangedSetting == Radar.radarLootThreshold))
+            {
+                if (Radar.radarEnableLootConfig.Value)
+                {
+                    ClearLoot();
+                    // Init loot items
+                    var allLoot = _gameWorld.LootItems;
+                    float xMin = 99999, xMax = -99999, yMin = 99999, yMax = -99999;
+                    foreach (LootItem loot in allLoot.GetValuesEnumerator())
+                    {
+                        AddLoot(loot);
+                        Vector2 loc = new Vector2(loot.TrackableTransform.position.x, loot.TrackableTransform.position.z);
+                        if (loc.x < xMin)
+                            xMin = loc.x;
+                        if (loc.x > xMax)
+                            xMax = loc.x;
+                        if (loc.y < yMin)
+                            yMin = loc.y;
+                        if (loc.y > yMax)
+                            yMax = loc.y;
+                    }
+                    //Debug.LogError($"Add {_lootCustomObject.Count} items, Min/Max x/z: {xMin} {xMax} {yMin} {yMax}");
+                    _lootTree = new Quadtree(Rect.MinMaxRect(xMin * 1.1f, yMin * 1.1f, xMax * 1.1f, yMax * 1.1f));
+                    foreach (BlipLoot loot in _lootCustomObject)
+                    {
+                        _lootTree.Insert(loot);
+                    }
+                }
+                else
+                {
+                    ClearLoot();
+                }
+            }
+        }
+
+        public void AddLoot(LootItem item, bool lazyUpdate = false, int key = 0)
+        {
+            var blip = new BlipLoot(item, lazyUpdate, key);
+            if (blip._price > Radar.radarLootThreshold.Value)
+            {
+                blip.SetBlip();
+                _lootCustomObject.Add(blip);
+                _lootTree?.Insert(blip);
+            }
+            else
+            {
+                blip.DestoryLoot();
+            }
+        }
+
+        public void RemoveLoot(int key)
+        {
+            Vector2 point = Vector2.zero;
+            
+            foreach (var loot in _lootCustomObject)
+            {
+                if (loot._key == key)
+                {
+                    point.x = loot.targetPosition.x;
+                    point.y = loot.targetPosition.z;
+                    loot.DestoryLoot();
+                    _lootCustomObject.Remove(loot);
+                    break;
+                }
+            }
+            _lootTree.Remove(point, key);
         }
 
         private void TogglePulseAnimation(bool enable)
@@ -188,41 +274,22 @@ namespace Radar
             {
                 return;
             }
-
-            if (!Radar.radarEnableLootConfig.Value)
+            Vector2 center = new Vector2(_player.Transform.position.x, _player.Transform.position.z);
+            var latestActiveLootOnRadar = _lootTree?.QueryRange(center, Radar.radarRangeConfig.Value);
+            _lootToHide.Clear();
+            if (_activeLootOnRadar != null)
             {
-                // clear _lootList to avoid FPS drop
-                if (_lootList.Count > 0)
+                foreach (var old in _activeLootOnRadar)
                 {
-                    _lootList.Clear();
-                    foreach (var loot in _lootCustomObject)
+                    if (latestActiveLootOnRadar == null || !latestActiveLootOnRadar.Contains(old))
                     {
-                        loot.DestoryLoot();
+                        _lootToHide.Add(old);
                     }
-                    _lootCustomObject.Clear();
-                }
-                return;
-            }
-
-            HashSet<string> checkedLoot = new HashSet<string>();
-            var allLoot = _gameWorld.LootItems;
-            foreach (LootItem loot in allLoot.GetValuesEnumerator())
-            {
-                checkedLoot.Add(loot.ItemId);
-                if (!_lootList.Contains(loot.ItemId))
-                {
-                    _lootList.Add(loot.ItemId);
-                    _lootCustomObject.Add(new BlipLoot(loot));
                 }
             }
 
-            foreach (var item in _lootCustomObject.Where(item => !checkedLoot.Contains(item.itemId)).ToList()) // ToList creates a copy to avoid modification during enumeration
-            {
-                item.DestoryLoot();
-                _lootList.Remove(item.itemId);
-            }
-
-            _lootCustomObject.RemoveAll(item => !checkedLoot.Contains(item.itemId));
+            _activeLootOnRadar?.Clear();
+            _activeLootOnRadar = latestActiveLootOnRadar;
         }
 
         private void UpdateRadar(bool positionUpdate = true)
@@ -233,9 +300,18 @@ namespace Radar
             {
                 obj.Update(positionUpdate);
             }
-            foreach (var obj in _lootCustomObject)
+
+            foreach (var obj in _lootToHide)
             {
-                obj.Update(positionUpdate);
+                obj.Update(positionUpdate, false);
+            }
+
+            if (_activeLootOnRadar != null)
+            {
+                foreach (var obj in _activeLootOnRadar)
+                {
+                    obj.Update(positionUpdate, true);
+                }
             }
         }
     }
