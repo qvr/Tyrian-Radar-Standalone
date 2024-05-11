@@ -33,6 +33,8 @@ namespace Radar
                 {"radar_y_position_info","Y Position for the Radar Hud."},
                 {"radar_range","Radar Range"},
                 {"radar_range_info","The range within which enemies and loots are displayed on the radar."},
+                {"radar_filter_combat", "Show bots in combat only"},
+                {"radar_filter_combat_info", "Only bots recently engaged in combat are displayed on the radar."},
                 {"radar_scan_interval","Radar Scan Interval"},
                 {"radar_scan_interval_info","The interval between two scans."},
                 {"radar_loot_threshold","Loot Threshold"},

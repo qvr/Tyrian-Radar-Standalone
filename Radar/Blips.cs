@@ -11,6 +11,7 @@ namespace Radar
     {
         private Player? _enemyPlayer = null;
         private bool _isDead = false;
+        private bool _isInCombat = false;
         public BlipPlayer(Player enemyPlayer)
         {
             this._enemyPlayer = enemyPlayer;
@@ -82,13 +83,38 @@ namespace Radar
                     blipPosition.x = targetPosition.x - playerPosition.x;
                     blipPosition.y = targetPosition.y - playerPosition.y;
                     blipPosition.z = targetPosition.z - playerPosition.z;
+
+                    // check if bot is or was recently engaged in combat
+                    BotOwner? _botOwner = _enemyPlayer.AIData?.BotOwner;
+                    if (_botOwner != null)
+                    {
+                        bool inCombat = !_botOwner.Memory.IsPeace;
+                        bool hasCloseDanger = _botOwner.Memory.DangerData.HaveCloseDanger;
+
+                        float maxTimeSinceCombatEnded = 30;
+                        bool wasInCombat = (Time.time - _botOwner.Memory.LastTimeHit) < maxTimeSinceCombatEnded;
+                        wasInCombat |= (Time.time - _botOwner.Memory.EnemySetTime) < maxTimeSinceCombatEnded;
+                        wasInCombat |= (Time.time - _botOwner.Memory.LastEnemyTimeSeen) < maxTimeSinceCombatEnded;
+                        wasInCombat |= (Time.time - _botOwner.Memory.UnderFireTime) < maxTimeSinceCombatEnded;
+
+                        _isInCombat = inCombat || wasInCombat || hasCloseDanger;
+                    } else 
+                    {
+                        _isInCombat = true; // always show non-bot enemyPlayer objects (in case there are any)
+                    }
                 }
 
                 _show = blipPosition.x * blipPosition.x + blipPosition.z * blipPosition.z
                      > radarRange * radarRange ? false : true;
+
                 if (!_isDead && _enemyPlayer.HealthController.IsAlive == _isDead)
                 {
                     _isDead = true;
+                }
+
+                // apply combat filter if enabled
+                if (_show && !_isDead && Radar.radarEnableCombatFilter.Value) {
+                    _show = _isInCombat;
                 }
 
                 if (_isDead)

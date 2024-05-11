@@ -26,6 +26,7 @@ namespace Radar
         public static ConfigEntry<bool> radarEnablePulseConfig;
         public static ConfigEntry<bool> radarEnableCorpseConfig;
         public static ConfigEntry<bool> radarEnableLootConfig;
+        public static ConfigEntry<bool> radarEnableCombatFilter;
         public static ConfigEntry<KeyboardShortcut> radarEnableShortCutConfig;
         public static ConfigEntry<KeyboardShortcut> radarEnableCorpseShortCutConfig;
         public static ConfigEntry<KeyboardShortcut> radarEnableLootShortCutConfig;
@@ -96,6 +97,7 @@ namespace Radar
                 new ConfigDescription(Locales.GetTranslatedString("radar_scan_interval_info"), new AcceptableValueRange<float>(0.1f, 30f)));
             radarLootThreshold = Config.Bind<float>(radarSettings, Locales.GetTranslatedString("radar_loot_threshold"), 30000f,
                 new ConfigDescription(Locales.GetTranslatedString("radar_loot_threshold_info"), new AcceptableValueRange<float>(5000f, 100000f)));
+            radarEnableCombatFilter = Config.Bind(radarSettings, Locales.GetTranslatedString("radar_filter_combat"), false, Locales.GetTranslatedString("radar_filter_combat_info"));
             
             bossBlipColor = Config.Bind<Color>(colorSettings, Locales.GetTranslatedString("radar_boss_blip_color"), new Color(1f, 0f, 0f));
             scavBlipColor = Config.Bind<Color>(colorSettings, Locales.GetTranslatedString("radar_scav_blip_color"), new Color(0f, 1f, 0f));
